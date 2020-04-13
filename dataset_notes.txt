@@ -1,0 +1,20 @@
+Parent Hierarchy
+Prefix Structure of names
+https://www.reddit.com/dev/api/#fullnames
+
+Example:
+https://www.reddit.com/r/bloodborne/comments/34gitq/the_pvp_fight_that_finally_got_me_interestedmuch/
+
+the comment
+https://www.reddit.com/api/info.json?id=t1_cqug90l
+is child of the comment
+https://www.reddit.com/api/info.json?id=t1_cqug10q
+is child of the comment
+https://www.reddit.com/api/info.json?id=t1_cquficx
+is child of the link(submission)
+https://www.reddit.com/api/info.json?id=t3_34gitq
+
+
+name field(column) in the dataset holds the actual id of the column
+link_id field(column) is for the actual submission(link) of the comment
+
