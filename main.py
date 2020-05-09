@@ -4,11 +4,22 @@
 import sqlite3
 from sqlite3 import Error
 from tqdm import tqdm
+import igraph as ig
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
+
+
+def community_detection(graph_file):
+    g = ig.Graph.Read_Ncol('reddit_casualconversation_network.txt')
+    g_undirected = g.as_undirected()
+    dendrogram = g_undirected.community_fastgreedy()
+    
+    clustering=dendrogram.as_clustering()
+    membership=clustering.membership
+    return membership
 
 def recursive_parenting(cur, edges, comment_id, weight):
     # Get the author and parent id of the comment
@@ -65,10 +76,13 @@ def connect_db_in_memory(dataset_filename):
     except Error as e:
         print(e)
         return None
-
-if __name__ == '__main__':
+    
+def db_to_graph(dataset_filename):
     conn = connect_db_in_memory(dataset_filename)
     cur = conn.cursor()
     generate_graph_data(cur, "reddit_casualconversation_network.txt") 
     if conn:
         conn.close()
+
+if __name__ == '__main__':
+    community_detection('reddit_casualconversation_network.txt')
