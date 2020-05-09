@@ -5,12 +5,70 @@ import sqlite3
 from sqlite3 import Error
 from tqdm import tqdm
 import igraph as ig
+import nltk
+from nltk.tokenize import RegexpTokenizer
+from nltk.corpus import stopwords
+from nltk import ngrams
+import pickle
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
 
+class NgramSets:
+    pass
+
+def load_feature(file_name):
+    dbfile = open(file_name, 'rb')      
+    db = pickle.load(dbfile) 
+    dbfile.close() 
+    return db
+
+# Note that all ngrams of all authors are kept in memory currently
+def feature_ngram_overlap(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    tokenizer = RegexpTokenizer(r'\w+')
+    stop_words = set(stopwords.words('english'))
+    author_ngrams = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() #rows holds ids of all comments made by the author
+        unigrams_set = set()
+        bigrams_set = set()
+        trigrams_set = set()
+        for comment in comments:
+            sentences = nltk.sent_tokenize(comment[0])
+            for sentence in sentences:
+                tokens = tokenizer.tokenize(sentence)
+                filtered_sentence = [w for w in tokens if not w in stop_words]
+                bigrams = ngrams(filtered_sentence, 2)
+                trigrams = ngrams(filtered_sentence,3)
+                for unigram in filtered_sentence: #Tokens are alredy unigram
+                    unigrams_set.add(unigram)
+                for bigram in bigrams:
+                    bigrams_set.add(bigram)
+                for trigram in trigrams:
+                    trigrams_set.add(trigram)
+         # Now we have a set of ngrams of each author
+        author_ngram_sets = NgramSets()
+        author_ngram_sets.unigrams = unigrams_set
+        author_ngram_sets.bigrams = bigrams_set
+        author_ngram_sets.trigrams = trigrams_set
+        author_ngrams[author[0]] = author_ngram_sets
+
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
+    ngrams_file = open('feature_ngrams.pkl', 'ab')
+    pickle.dump(author_ngrams, ngrams_file)                      
+    ngrams_file.close() 
+    
 
 def community_detection(graph_file):
     g = ig.Graph.Read_Ncol('reddit_casualconversation_network.txt')
@@ -85,4 +143,4 @@ def db_to_graph(dataset_filename):
         conn.close()
 
 if __name__ == '__main__':
-    community_detection('reddit_casualconversation_network.txt')
+    feature_ngram_overlap(dataset_filename)
