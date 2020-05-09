@@ -18,3 +18,18 @@ https://www.reddit.com/api/info.json?id=t3_34gitq
 name field(column) in the dataset holds the actual id of the column
 link_id field(column) is for the actual submission(link) of the comment
 
+Subreddit: 
+Subreddit id: t5_323oy
+https://www.reddit.com/r/CasualConversation/about.json
+
+Distinct Authors in CasualConversation: 15431
+Total comments in CasualConversation: 234694
+
+Total Distinct Authors in Database: 2611449
+Total Comments in Database: 54504410
+Total Number of Subreddits: 50138
+
+AskReddit_id = t5_2qh1i
+Distinct Authors in AskReddit:  570735
+Total Comments in AskReddit:   4234970
+
