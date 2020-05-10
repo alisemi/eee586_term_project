@@ -19,6 +19,34 @@ total_comments = 234694
 class NgramSets:
     pass
 
+
+def overlapping_ngrams():
+    author_ngrams = load_feature('feature_ngrams.pkl')
+    unigram_file = open("unigram_overlap_network.txt", "w")
+    bigram_file = open("bigram_overlap_network.txt", "w")
+    trigram_file = open("trigram_overlap_network.txt", "w")
+    authors = list(author_ngrams.keys())
+    for i in tqdm(range(len(authors))):
+        source_ngrams = author_ngrams[authors[i]]
+        for j in range(i+1,len(authors)):
+            target_ngrams = author_ngrams[authors[j]]
+            # Unigrams
+            if len(source_ngrams.unigrams) > 0:
+                unigram_ratio = len(source_ngrams.unigrams.intersection(target_ngrams.unigrams))/len(source_ngrams.unigrams)
+                if unigram_ratio >= 0.15: # Threshold
+                    print(authors[i] + " " + authors[j] + " " + str(unigram_ratio), file=unigram_file)
+            # Bigrams
+            if len(source_ngrams.bigrams) > 0:
+                bigram_ratio = len(source_ngrams.bigrams.intersection(target_ngrams.bigrams))/len(source_ngrams.bigrams)
+                if bigram_ratio >= 0.05:
+                    print(authors[i] + " " + authors[j] + " " + str(bigram_ratio), file=bigram_file)
+            # Trigrams
+            if len(source_ngrams.trigrams) > 0:
+                trigram_ratio = len(source_ngrams.trigrams.intersection(target_ngrams.trigrams))/len(source_ngrams.trigrams)
+                if trigram_ratio > 0.01:
+                    print(authors[i] + " " + authors[j] + " " + str(trigram_ratio), file=trigram_file)
+        
+
 def load_feature(file_name):
     dbfile = open(file_name, 'rb')      
     db = pickle.load(dbfile) 
@@ -26,7 +54,7 @@ def load_feature(file_name):
     return db
 
 # Note that all ngrams of all authors are kept in memory currently
-def feature_ngram_overlap(dataset_filename):
+def feature_ngrams(dataset_filename):
     conn = connect_db_in_memory(dataset_filename)
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT author FROM data")
@@ -71,8 +99,8 @@ def feature_ngram_overlap(dataset_filename):
     
 
 def community_detection(graph_file):
-    g = ig.Graph.Read_Ncol('reddit_casualconversation_network.txt')
-    g_undirected = g.as_undirected()
+    g = ig.Graph.Read_Ncol(graph_file)
+    g_undirected = g.as_undirected(combine_edges="sum")
     dendrogram = g_undirected.community_fastgreedy()
     
     clustering=dendrogram.as_clustering()
@@ -143,4 +171,4 @@ def db_to_graph(dataset_filename):
         conn.close()
 
 if __name__ == '__main__':
-    feature_ngram_overlap(dataset_filename)
+    overlapping_ngrams()
