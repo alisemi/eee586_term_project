@@ -10,15 +10,44 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk import ngrams
 import pickle
+import language_check
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
 
+
+# Gives the grammar_mistake/sentence for each author
+def feature_grammar_check(dataset_filename):
+    tool = language_check.LanguageTool('en-US')
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    author_grammars = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() #rows holds ids of all comments made by the author
+        comments = list(map(lambda x: x[0], comments)) 
+        single_text = ''.join(comments)
+        sentences = nltk.sent_tokenize(single_text)
+        matches = tool.check(single_text)
+        if len(sentences) > 0:
+            author_grammars[author[0]] = len(matches)/len(sentences)
+        
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
+    
+    ngrams_file = open('feature_grammar_check.pkl', 'ab')
+    pickle.dump(author_grammars, ngrams_file)                      
+    ngrams_file.close()
+
 class NgramSets:
     pass
-
 
 def overlapping_ngrams():
     author_ngrams = load_feature('feature_ngrams.pkl')
@@ -171,4 +200,4 @@ def db_to_graph(dataset_filename):
         conn.close()
 
 if __name__ == '__main__':
-    overlapping_ngrams()
+    feature_grammar_check(dataset_filename)
