@@ -22,6 +22,7 @@ recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
 
+
 # merge graph files
 def merge_graphs(file_list, scalar_list, output_filename):
     if os.path.exists(output_filename):
@@ -45,7 +46,7 @@ def normalize_graph(graph_filename):
     graph_file = open(graph_filename)
     line = graph_file.readline() 
     max_val = float(line.split()[2])
-    min_val = 0
+    min_val = 0.0
     while True:     
         # Get next line from file 
         line = graph_file.readline() 
@@ -67,8 +68,7 @@ def normalize_graph(graph_filename):
     for line in fileinput.input(graph_filename, inplace=1):
         line_components = line.split()
         new_weight = (float(line_components[2])-min_val)/(max_val-min_val)
-        print(line_components[0] + " " + line_components[1] + " " + str(new_weight))
-    
+        print(line_components[0] + " " + line_components[1] + " " + str(new_weight))   
     
     
 def feature_to_graph(feature_file):
@@ -111,7 +111,6 @@ def feature_to_graph(feature_file):
         for edge in edges:    
             print(feature_normed[i][0] + " " + edge[0] + " " + str(edge[1]), file=graph_file) 
     
-
 
 # Gives the grammar_mistake/sentence for each author
 def feature_grammar_check(dataset_filename):
@@ -225,15 +224,82 @@ def feature_ngrams(dataset_filename):
     pickle.dump(author_ngrams, ngrams_file)                      
     ngrams_file.close() 
     
+    
+def draw_graph_clusters(cluster_obj, output_filename):
+    visual_style = dict()
+    visual_style["bbox"] = (700, 600)
+    visual_style["vertex_label"] = cluster_obj.graph.vs["name"]
+    ig.plot(cluster_obj,output_filename,mark_groups = True,**visual_style)
+
+
+# Used for a bug in igraph, floating point weights in file are problematic
+def scale_graph(graph_filename, scale):
+    for line in fileinput.input(graph_filename, inplace=1):
+        line_components = line.split()
+        new_weight = int(float(line_components[2])*1000)
+        if new_weight > 0:       
+            print(line_components[0] + " " + line_components[1] + " " + str(new_weight))   
+    
 
 def community_detection(graph_file):
-    g = ig.Graph.Read_Ncol(graph_file)
-    g_undirected = g.as_undirected(combine_edges="sum")
-    dendrogram = g_undirected.community_fastgreedy()
+    print("Reading the graph file...")
+    normalize_graph(graph_file)
+    scale_graph(graph_file,1000) # Related to a bug in igraph
+    g = ig.Graph.Read_Ncol(graph_file,directed=False)
+    g.simplify(combine_edges='sum')
     
-    clustering=dendrogram.as_clustering()
-    membership=clustering.membership
-    return membership
+    print("Running Community Detection Algorithms...")
+    communities = {}
+        
+    # Walktrap Method, time O(mn^2) and space O(n^2) in the worst case
+    '''
+    dendogram = g.community_walktrap(weights=g.es["weight"], steps = 4)
+    clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] = (clusters.membership[i],)
+    '''
+    
+    # Fast Greedy, greedy optimization of modularity,
+    # n vertices and m edges is O(mdlogn) where d is the depth of the 
+    # dendrogram describing the community structure
+    dendogram = g.community_fastgreedy(weights=g.es["weight"])
+    clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] = (clusters.membership[i],)
+        
+    # Leiden, TODO parameters
+    clusters = dendogram = g.community_leiden(weights=g.es["weight"])
+    #clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)    
+    
+    # Infomap method, space constraint
+    '''
+    clusters = g.community_infomap(edge_weights=g.es["weight"])
+    #clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+    '''
+    
+    # Label Propogation
+    clusters = g.community_label_propagation(weights=g.es["weight"])
+    #clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+    
+    # Newman's eigenvector
+    clusters = g.community_leading_eigenvector(weights=g.es["weight"])
+    #clusters = dendogram.as_clustering()
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+        
+    # Multi level clustering algorithm
+    clusters = g.community_multilevel(weights=g.es["weight"])
+    for i in range(len(clusters.membership)):
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+    
+      
+    return communities
 
 def recursive_parenting(cur, edges, comment_id, weight):
     # Get the author and parent id of the comment
