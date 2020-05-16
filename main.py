@@ -516,6 +516,22 @@ def linefit_slope(x, y):
     slope = (((np.mean(x) * np.mean(y)) - np.mean(x*y)) / ((np.mean(x)**2) - np.mean(x**2)))
     return slope
 
+# reads a feature file and generate clusters based on k-means clustering
+# ------- NOT COMPLETE -------
+def feature_to_cluster(feature_filename, num_clusters):
+    data = load_feature(feature_filename)
+    authors = list(data.keys())
+    points = np.array([])
+    for i in tqdm(range(len(authors))):
+        print(data[authors[i]])
+        points = np.append(points, data[authors[i]])
+    print(points)
+    points = points.reshape(-1, 1) # because the original data is 1D, reshaping is needed
+    kmeans = KMeans(n_clusters = num_clusters)
+    kmeans = kmeans.fit(points)
+    labels = kmeans.predict(points)
+    return labels
+
 if __name__ == '__main__':
     print("lölölöl")
     print("lelele")
