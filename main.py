@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import sqlite3
 from sqlite3 import Error
 from tqdm import tqdm
@@ -15,6 +12,10 @@ import math
 import statistics
 import fileinput
 import os
+import re
+import numpy as np
+import string
+from profanity_check import predict, predict_prob
 from shutil import copyfile
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
@@ -365,5 +366,156 @@ def db_to_graph(dataset_filename):
     if conn:
         conn.close()
 
+def feature_profanity(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0;
+    author_profanity = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() # rows hold ids of all comments made by the author
+        if (len(comments) < 4):
+            continue
+        comments = list(map(lambda x: x[0], comments)) 
+        single_text = ''.join(comments)
+        profanity_rate = predict_prob(single_text)
+        author_profanity[author[0]] = profanity_rate
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    profanity_file = open('feature_profanity.pkl', 'ab')
+    pickle.dump(author_profanity, profanity_file)
+    profanity_file.close()
+           
+def feature_punct(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    comments_sum = 0
+    author_punct = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() # rows hold ids of all comments made by the author
+        if (len(comments) < 4):
+            continue
+        punct_count = 0
+        character_count = 0
+        for comment in comments:
+            for character in comment[0]:
+                if character in string.punctuation:
+                    punct_count += 1
+                character_count += len(comment[0])
+        punct_rate = punct_count / character_count
+        author_punct[author[0]] = punct_rate
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    punct_file = open('feature_punct.pkl', 'ab')
+    pickle.dump(author_punct, punct_file)
+    punct_file.close()
+
+def feature_emoji(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    author_emoji = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() # rows hold ids of all comments made by the author
+        if (len(comments) < 4):
+            continue
+        emoji_count = 0;
+        character_count = 0;
+        for comment in comments:
+            emoji_count += len(re.findall(r'(?::|;|=|x)(?:-)?(?:\)|\(D|P|S)',comment[0]))
+            character_count += len(comment[0])
+        emoji_rate = emoji_count / character_count
+        author_emoji[author[0]] = emoji_rate
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    emoji_file = open('feature_emoji.pkl', 'ab')
+    pickle.dump(author_emoji, emoji_file)
+    emoji_file.close()
+    
+def feature_uppercase(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
+    target =('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    author_uppercase = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() # rows hold ids of all comments made by the author
+        if (len(comments) < 4):
+            continue
+        uppercase_count = 0
+        character_count = 0
+        for comment in comments:
+            for character in comment[0]:
+                if (character.isupper()):
+                    uppercase_count += 1
+                character_count += len(comment[0])
+        uppercase_rate = uppercase_count / character_count
+        author_uppercase[author[0]] = uppercase_rate
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    uppercase_file = open('feature_uppercase.pkl', 'ab')
+    pickle.dump(author_uppercase, uppercase_file)
+    uppercase_file.close()
+
+def feature_zipf(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    author_zipf = {}
+    tokenizer = RegexpTokenizer(r'\w+')
+    stop_words = set(stopwords.words('english'))
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() # rows hold ids of all comments made by the author
+        if (len(comments) < 4):
+            continue
+        fd = FreqDist()
+        for comment in comments:
+            sentences = nltk.sent_tokenize(comment[0])
+            for sentence in sentences:
+                tokens = tokenizer.tokenize(sentence)
+                filtered_sentence = [w for w in tokens if not w in stop_words]
+                for word in filtered_sentence:
+                    fd[word] += 1
+        ranks = np.array([])
+        freqs = np.array([])
+        for rank, word in enumerate(fd):
+            np.append(ranks, rank + 1)
+            np.append(freqs, fd[word])
+        slope = linefit_slope(np.log(ranks), np.log(freqs))
+        author_zipf[author[0]] = slope
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    zipf_file = open('feature_zipf.pkl', 'ab')
+    pickle.dump(author_zipf, zipf_file)
+    zipf_file.close()
+
+# calculates the slope of the best-fitting line
+def linefit_slope(x, y):
+    slope = (((np.mean(x) * np.mean(y)) - np.mean(x*y)) / ((np.mean(x)**2) - np.mean(x**2)))
+    return slope
+
 if __name__ == '__main__':
     print("lölölöl")
+    print("lelele")
