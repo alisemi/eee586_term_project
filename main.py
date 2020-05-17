@@ -312,6 +312,40 @@ def rand_index(communities1, communities2, number_of_algorithms):
     return rand_index_values    
     
 
+def remove_unused_authors(graph_filename, output_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    our_authors = []
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() #rows holds ids of all comments made by the author
+        if len(comments) > 3:
+            our_authors.append(author)
+    our_authors = list(map(lambda x: x[0], our_authors))
+    
+    input_file = open(graph_filename,'r')
+    output_file = open(output_filename, 'w')
+    
+    while True:     
+        # Get next line from file 
+        line = input_file.readline() 
+        # if line is empty 
+        # end of file is reached 
+        if not line: 
+            break
+        line_components = line.split()
+        
+        if line_components[0] in our_authors and line_components[1] in our_authors:
+            print(line[:-1],file=output_file)
+            
+    input_file.close()
+    output_file.close()
+    
+
 def community_detection(graph_file):
     print("Reading the graph file...")
     normalize_graph(graph_file)
@@ -333,16 +367,20 @@ def community_detection(graph_file):
     # Fast Greedy, greedy optimization of modularity,
     # n vertices and m edges is O(mdlogn) where d is the depth of the 
     # dendrogram describing the community structure
+    print("Fast Greedy is running...")
     dendogram = g.community_fastgreedy(weights=g.es["weight"])
     clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] = (clusters.membership[i],)
+    print("Fast Greedy is done...")
         
+    print("Leiden is running...")
     # Leiden, TODO parameters
-    clusters = dendogram = g.community_leiden(weights=g.es["weight"])
+    clusters = dendogram = g.community_leiden(weights=g.es["weight"], n_iterations=4)
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
-        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)    
+        communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],) 
+    print("Leiden is done...")
     
     # Infomap method, space constraint
     '''
@@ -353,22 +391,27 @@ def community_detection(graph_file):
     '''
     
     # Label Propogation
+    print("Label Propogation is running...")
     clusters = g.community_label_propagation(weights=g.es["weight"])
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+    print("Label Propogation is done...")
     
     # Newman's eigenvector
+    print("Newman's EigenVector is running...")
     clusters = g.community_leading_eigenvector(weights=g.es["weight"])
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
+    print("Newman's EigenVector is done...")
         
+    print("Multi level clustering is running...")
     # Multi level clustering algorithm
     clusters = g.community_multilevel(weights=g.es["weight"])
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
-    
+    print("Multi level clustering is done...")
       
     return communities
 
