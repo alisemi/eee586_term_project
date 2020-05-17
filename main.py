@@ -162,6 +162,7 @@ def feature_grammar_check(dataset_filename):
         if len(comments) > 3:
             comments = list(map(lambda x: x[0], comments)) 
             single_text = ''.join(comments)
+            single_text = single_text.lower()
             sentences = nltk.sent_tokenize(single_text)
             if len(sentences) > 0: # Just a precaution
                 matches = tool.check(single_text)
@@ -234,6 +235,7 @@ def feature_ngrams(dataset_filename):
             for comment in comments:
                 sentences = nltk.sent_tokenize(comment[0])
                 for sentence in sentences:
+                    sentence = sentence.lower()
                     tokens = tokenizer.tokenize(sentence)
                     filtered_sentence = [w for w in tokens if not w in stop_words]
                     bigrams = ngrams(filtered_sentence, 2)
@@ -564,6 +566,7 @@ def feature_zipf(dataset_filename):
         for comment in comments:
             sentences = nltk.sent_tokenize(comment[0])
             for sentence in sentences:
+                sentence = sentence.lower()
                 tokens = tokenizer.tokenize(sentence)
                 filtered_sentence = [w for w in tokens if not w in stop_words]
                 for word in filtered_sentence:
