@@ -18,6 +18,7 @@ import string
 from profanity_check import predict, predict_prob
 from shutil import copyfile
 from sklearn.cluster import KMeans
+from nltk import FreqDist
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 acronyms_filename = "./list_acronym.txt"
@@ -425,7 +426,7 @@ def feature_profanity(dataset_filename):
         author_profanity[author[0]] = profanity_rate
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    profanity_file = open('feature_profanity.pkl', 'ab')
+    profanity_file = open('feature_profanity.pkl', 'wb')
     pickle.dump(author_profanity, profanity_file)
     profanity_file.close()
            
@@ -453,7 +454,7 @@ def feature_punct(dataset_filename):
         author_punct[author[0]] = punct_rate
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    punct_file = open('feature_punct.pkl', 'ab')
+    punct_file = open('feature_punct.pkl', 'wb')
     pickle.dump(author_punct, punct_file)
     punct_file.close()
 
@@ -480,7 +481,7 @@ def feature_emoji(dataset_filename):
         author_emoji[author[0]] = emoji_rate
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    emoji_file = open('feature_emoji.pkl', 'ab')
+    emoji_file = open('feature_emoji.pkl', 'wb')
     pickle.dump(author_emoji, emoji_file)
     emoji_file.close()
     
@@ -509,7 +510,7 @@ def feature_uppercase(dataset_filename):
         author_uppercase[author[0]] = uppercase_rate
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    uppercase_file = open('feature_uppercase.pkl', 'ab')
+    uppercase_file = open('feature_uppercase.pkl', 'wb')
     pickle.dump(author_uppercase, uppercase_file)
     uppercase_file.close()
 
@@ -540,13 +541,13 @@ def feature_zipf(dataset_filename):
         ranks = np.array([])
         freqs = np.array([])
         for rank, word in enumerate(fd):
-            np.append(ranks, rank + 1)
-            np.append(freqs, fd[word])
+            ranks = np.append(ranks, rank + 1)
+            freqs = np.append(freqs, fd[word])
         slope = linefit_slope(np.log(ranks), np.log(freqs))
         author_zipf[author[0]] = slope
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    zipf_file = open('feature_zipf.pkl', 'ab')
+    zipf_file = open('feature_zipf.pkl', 'wb')
     pickle.dump(author_zipf, zipf_file)
     zipf_file.close()
     
@@ -579,7 +580,7 @@ def feature_acronym(dataset_filename, acronyms_filename):
             author_acronym[author[0]] = acronym_rate
             comments_sum += len(comments)
             print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
-    acronym_file = open('feature_acronym.pkl', 'ab')
+    acronym_file = open('feature_acronym.pkl', 'wb')
     pickle.dump(author_acronym, acronym_file)
     acronym_file.close()
     
