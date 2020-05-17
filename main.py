@@ -596,7 +596,6 @@ def feature_acronym(dataset_filename, acronyms_filename):
     tokenizer = RegexpTokenizer(r'\w+')
     author_acronym = {}
     acronyms = open(acronyms_filename).read().splitlines()
-    print(acronyms)
     for author in tqdm(distinct_authors):
         cur.execute("SELECT body FROM data WHERE author=?", author)
         comments = cur.fetchall()
@@ -606,6 +605,8 @@ def feature_acronym(dataset_filename, acronyms_filename):
                 for sentence in sentences:
                     sentence = sentence.lower()
                     tokens = tokenizer.tokenize(sentence)
+                    if "tl&dr" in sentence or "tl;dr" in sentence:
+                        acronym_count += 1
                     for token in tokens:
                         if token in acronyms:
                             acronym_count += 1
@@ -613,7 +614,7 @@ def feature_acronym(dataset_filename, acronyms_filename):
             acronym_rate = acronym_count / character_count
             author_acronym[author[0]] = acronym_rate
             comments_sum += len(comments)
-            # print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+            print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
     acronym_file = open('feature_acronym.pkl', 'wb')
     pickle.dump(author_acronym, acronym_file)
     acronym_file.close()
