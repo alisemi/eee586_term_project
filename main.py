@@ -19,6 +19,8 @@ from profanity_check import predict, predict_prob
 from shutil import copyfile
 from sklearn.cluster import KMeans
 from nltk import FreqDist
+import collections
+from sklearn import metrics
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 acronyms_filename = "./list_acronym.txt"
@@ -274,6 +276,38 @@ def scale_graph(graph_filename, scale):
         if new_weight > 0:       
             print(line_components[0] + " " + line_components[1] + " " + str(new_weight))   
     
+
+# Evalutaes the clusters based on a number of metrics, communities1 is the ground truth
+# Refer to https://scikit-learn.org/stable/modules/clustering.html#clustering-performance-evaluation
+def evaluate(communities1, communities2, number_of_algorithms):
+    c1 = communities1.copy()
+    c2 = communities2.copy()
+    
+    # Making sure they have the same size
+    c1_keys = list(c1.keys())
+    c2_keys = list(c2.keys())
+    
+    for key in c1_keys:
+        if not key in c2:
+            del c1[key]
+    for key in c2_keys:
+        if not key in c1:
+            del c2[key]
+            
+    od1 = collections.OrderedDict(sorted(c1.items()))
+    od2 = collections.OrderedDict(sorted(c2.items()))
+    evaluations = []
+        
+    for i in range(0,number_of_algorithms):
+        cluster1_list = list(map(lambda x: x[i], od1.values()))
+        cluster2_list = list(map(lambda x: x[i], od2.values()))
+        ari = metrics.adjusted_rand_score(cluster1_list, cluster2_list)
+        ami = metrics.adjusted_mutual_info_score(cluster1_list, cluster2_list) 
+        v_score = metrics.v_measure_score(cluster1_list, cluster2_list)
+        fmc = metrics.fowlkes_mallows_score(cluster1_list, cluster2_list)
+        evaluations.append((ari,ami,v_score,fmc))
+    return evaluations
+
 
 # Get rand index for each community algoritms
 def rand_index(communities1, communities2, number_of_algorithms):
