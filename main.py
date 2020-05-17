@@ -621,7 +621,6 @@ def linefit_slope(x, y):
     return slope
 
 # reads a feature file and generate clusters based on k-means clustering
-# ------- NOT COMPLETE -------
 def feature_to_cluster(feature_filename, num_clusters):
     data = load_feature(feature_filename)
     authors = list(data.keys())
@@ -632,7 +631,10 @@ def feature_to_cluster(feature_filename, num_clusters):
     kmeans = KMeans(n_clusters = num_clusters)
     kmeans = kmeans.fit(points)
     labels = kmeans.predict(points)
-    return labels
+    clusters = {}
+    for i in tqdm(range(len(authors))):
+        clusters[authors[i]] = (labels[i],)
+    return clusters
 
 if __name__ == '__main__':
     print("lölölöl")
