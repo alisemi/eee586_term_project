@@ -116,6 +116,35 @@ def feature_to_graph(feature_file):
             print(feature_normed[i][0] + " " + edge[0] + " " + str(edge[1]), file=graph_file) 
     
 
+# Gives the average sentence length for each author
+def feature_sentence_length(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    author_grammars = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() #rows holds ids of all comments made by the author
+        if len(comments) > 3:
+            comments = list(map(lambda x: x[0], comments)) 
+            single_text = ''.join(comments)
+            sentences = nltk.sent_tokenize(single_text)
+            if len(sentences) > 0: # Just a precaution
+                total_sentence_length = sum(map(lambda x: len(x), sentences))
+                author_grammars[author[0]] = total_sentence_length/len(sentences)
+        
+        comments_sum += len(comments)
+        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
+    
+    ngrams_file = open('feature_sentence_length.pkl', 'wb')
+    pickle.dump(author_grammars, ngrams_file)                      
+    ngrams_file.close()
+
+
 # Gives the grammar_mistake/sentence for each author
 def feature_grammar_check(dataset_filename):
     tool = language_check.LanguageTool('en-US')
