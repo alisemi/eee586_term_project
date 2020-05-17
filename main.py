@@ -243,6 +243,43 @@ def scale_graph(graph_filename, scale):
             print(line_components[0] + " " + line_components[1] + " " + str(new_weight))   
     
 
+# Get rand index for each community algoritms
+def rand_index(communities1, communities2, number_of_algorithms):
+    rand_index_values = []
+    all_keys = set(communities1.keys()) | set(communities2.keys())
+    all_keys = list(all_keys)
+    n_choose_2 = (len(all_keys) * (len(all_keys)-1))/2
+    for k in range(0,number_of_algorithms):
+        true_positive_negative = 0
+        for i in range(0,len(all_keys)):
+            source_cluster1 = -1
+            source_cluster2 = -1
+            if all_keys[i] in communities1:
+                    source_cluster1 = communities1[all_keys[i]][k]           
+            if all_keys[i] in communities2:
+                    source_cluster2 = communities2[all_keys[i]][k]
+            
+            for j in range(i+1,len(all_keys)):
+                same1 = False
+                same2 = False
+                target_cluster1 = -1
+                target_cluster2 = -1
+                if all_keys[j] in communities1:
+                    target_cluster1 = communities1[all_keys[j]][k]
+                if all_keys[j] in communities2:
+                    target_cluster2 = communities2[all_keys[j]][k]
+                        
+                if source_cluster1 == target_cluster1:
+                    same1 = True
+                if source_cluster2 == target_cluster2:
+                    same2 = True 
+                
+                if same1 == same2: # They are either in same clusters or both in different clusters
+                    true_positive_negative += 1
+        rand_index_values.append(true_positive_negative/n_choose_2)
+    return rand_index_values    
+    
+
 def community_detection(graph_file):
     print("Reading the graph file...")
     normalize_graph(graph_file)
