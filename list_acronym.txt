@@ -2,7 +2,6 @@ aamof
 afaik
 afk
 bc
-b/c
 bff
 brb
 btt
@@ -55,9 +54,8 @@ iirc
 itt
 srs
 dea
-tl;dr
+tldr
 so
-dm;hs
 ianal
 gtfo
 nsfw
