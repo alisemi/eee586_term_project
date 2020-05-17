@@ -20,6 +20,7 @@ from shutil import copyfile
 from sklearn.cluster import KMeans
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
+acronyms_filename = "./list_acronym.txt"
 recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
@@ -548,6 +549,40 @@ def feature_zipf(dataset_filename):
     zipf_file = open('feature_zipf.pkl', 'ab')
     pickle.dump(author_zipf, zipf_file)
     zipf_file.close()
+    
+def feature_acronym(dataset_filename, acronyms_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall()
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    comments_sum = 0
+    acronym_count = 0
+    character_count = 0
+    tokenizer = RegexpTokenizer(r'\w+')
+    author_acronym = {}
+    acronyms = open(acronyms_filename).readlines()
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall()
+        if (len(comments) > 3):
+            for comment in comments:
+                sentences = nltk.sent_tokenize(comment[0])
+                for sentence in sentences:
+                    tokens = tokenizer.tokenize(sentence)
+                    for token in tokens:
+                        if token in acronyms:
+                            acronym_count += 1
+                character_count += len(comment[0])
+            acronym_rate = acronym_count / character_count
+            author_acronym[author[0]] = acronym_rate
+            comments_sum += len(comments)
+            print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    acronym_file = open('feature_acronym.pkl', 'ab')
+    pickle.dump(author_acronym, acronym_file)
+    acronym_file.close()
+    
 
 # calculates the slope of the best-fitting line
 def linefit_slope(x, y):
