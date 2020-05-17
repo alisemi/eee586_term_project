@@ -17,6 +17,7 @@ import numpy as np
 import string
 from profanity_check import predict, predict_prob
 from shutil import copyfile
+from sklearn.cluster import KMeans
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 recursive_weigh_factor = 1/2
@@ -523,9 +524,7 @@ def feature_to_cluster(feature_filename, num_clusters):
     authors = list(data.keys())
     points = np.array([])
     for i in tqdm(range(len(authors))):
-        print(data[authors[i]])
         points = np.append(points, data[authors[i]])
-    print(points)
     points = points.reshape(-1, 1) # because the original data is 1D, reshaping is needed
     kmeans = KMeans(n_clusters = num_clusters)
     kmeans = kmeans.fit(points)
