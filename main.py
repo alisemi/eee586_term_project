@@ -422,8 +422,8 @@ def feature_profanity(dataset_filename):
             continue
         comments = list(map(lambda x: x[0], comments)) 
         single_text = ''.join(comments)
-        profanity_rate = predict_prob(single_text)
-        author_profanity[author[0]] = profanity_rate
+        profanity_rate = predict_prob([single_text])
+        author_profanity[author[0]] = profanity_rate[0]
         comments_sum += len(comments)
         print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
     profanity_file = open('feature_profanity.pkl', 'wb')
@@ -436,6 +436,7 @@ def feature_punct(dataset_filename):
     cur.execute("SELECT DISTINCT author FROM data")
     distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
     target = ('[deleted]',)
+    distinct_authors.remove(target)
     comments_sum = 0
     author_punct = {}
     for author in tqdm(distinct_authors):
