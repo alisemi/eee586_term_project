@@ -162,7 +162,6 @@ def feature_grammar_check(dataset_filename):
         if len(comments) > 3:
             comments = list(map(lambda x: x[0], comments)) 
             single_text = ''.join(comments)
-            single_text = single_text.lower()
             sentences = nltk.sent_tokenize(single_text)
             if len(sentences) > 0: # Just a precaution
                 matches = tool.check(single_text)
