@@ -806,5 +806,4 @@ def plot_results(evaluations, cluster_name,file_name):
     
 
 if __name__ == '__main__':
-    print("lölölöl")
-    print("lelele")
+    print("This file contains a collection of functions intended to be used in Spyder environment for the project of the course EEE 586: Statistical Foundations of Natural Language Processing in Bilkent University, Spring 2020.")
