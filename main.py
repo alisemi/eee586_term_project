@@ -778,6 +778,7 @@ def feature_to_cluster(feature_filenames_cluster, num_clusters):
     kmeans_file = open('kmeans_clusters.pkl', 'wb')
     pickle.dump(clusters, kmeans_file)
     kmeans_file.close()
+    return clusters
 
 if __name__ == '__main__':
     print("lölölöl")
