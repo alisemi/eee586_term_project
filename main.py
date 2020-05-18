@@ -21,6 +21,7 @@ from sklearn.cluster import KMeans
 from nltk import FreqDist
 import collections
 from sklearn import metrics
+import matplotlib.pyplot as plt
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
 acronyms_filename = "./list_acronym.txt"
@@ -228,6 +229,7 @@ def load_feature(file_name):
     db = pickle.load(dbfile) 
     dbfile.close() 
     return db
+
 
 # Note that all ngrams of all authors are kept in memory currently
 def feature_ngrams(dataset_filename):
@@ -779,6 +781,29 @@ def feature_to_cluster(feature_filenames_cluster, num_clusters):
     pickle.dump(clusters, kmeans_file)
     kmeans_file.close()
     return clusters
+
+# Evaluations are list of results
+def plot_results(evaluations, cluster_name,file_name):
+    #x= ["Adjusted Rand Index", "Adjusted Mutual Information", "V-measure","Fowlkes-Mallows Index"]
+    x= ["ARI", "AMI", "V-measure","FMI"]
+    community_algorithms = ["Fast Greedy","Leiden","Label Propogation","Newman's EigenVector","Multi-level Clustering"]
+    
+    for i in range(len(community_algorithms)):
+        plt.plot(x,list(evaluations[i]),label = community_algorithms[i])
+    
+    plt.title("Evaluations for " + cluster_name) 
+    # naming the x axis 
+    plt.xlabel("Evaluation Metrics") 
+    # naming the y axis 
+    plt.ylabel("Score") 
+    # show a legend on the plot 
+    plt.legend() 
+    # Save to a file
+    plt.savefig(file_name)
+    # function to show the plot 
+    plt.show()
+    
+    
 
 if __name__ == '__main__':
     print("lölölöl")
