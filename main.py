@@ -28,12 +28,16 @@ recursive_weigh_factor = 1/2
 base_weight = 1
 total_comments = 234694
 
+# Features except ngrams
+feature_file_list = ["feature_acronym.pkl","feature_emoji.pkl","feature_grammar_check.pkl","feature_profanity.pkl","feature_punct.pkl","feature_sentence_length.pkl","feature_uppercase.pkl","feature_zipf.pkl"]
+feature_graph_list = ["feature_acronym_graph.txt","feature_emoji_graph.txt","feature_grammar_check_graph.txt","feature_profanity_graph.txt","feature_punct_graph.txt","feature_sentence_length_graph.txt","feature_uppercase_graph.txt","feature_zipf_graph.txt"]
+
 
 # merge graph files
 def merge_graphs(file_list, scalar_list, output_filename):
     if os.path.exists(output_filename):
         os.remove(output_filename) 
-    for i in range(len(file_list)):
+    for i in tqdm(range(len(file_list))):
         copyfile(file_list[i], "temp_graph.txt")
         for line in fileinput.input("temp_graph.txt", inplace=1):
             line_components = line.split()
@@ -77,11 +81,17 @@ def normalize_graph(graph_filename):
         print(line_components[0] + " " + line_components[1] + " " + str(new_weight))   
     
     
+def create_graphs_from_features(feature_file_list):
+    for file_name in tqdm(feature_file_list):
+        feature_to_graph(file_name)
+   
+    
 def feature_to_graph(feature_file):
     graph_file = open(feature_file[0:-4] + "_graph.txt", "w")
     feature = load_feature(feature_file)
     feature_list = list(feature.items())
     feature_list.sort(key=lambda tup: tup[1])
+    distance_adjustment = 0.01
     
     # Setting the log scale
     feature_logged = []
@@ -108,7 +118,7 @@ def feature_to_graph(feature_file):
         edges = []
         for j in range(i+1,len(feature_normed)):
             distance = feature_normed[j][1] - feature_normed[i][1]
-            if distance < std_deviation: # Similartiy should be at least 1-standart_deviation
+            if distance < std_deviation*distance_adjustment: # Similartiy should be at least 1-standart_deviation
                 similarity = 1-distance
                 edges.append((feature_normed[j][0],similarity))
             else: # Otherwise it is considered as zero, as list is sorted, no need to look at the rest
