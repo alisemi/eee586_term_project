@@ -32,6 +32,11 @@ total_comments = 234694
 feature_file_list = ["feature_acronym.pkl","feature_emoji.pkl","feature_grammar_check.pkl","feature_profanity.pkl","feature_punct.pkl","feature_sentence_length.pkl","feature_uppercase.pkl","feature_zipf.pkl"]
 feature_graph_list = ["feature_acronym_graph.txt","feature_emoji_graph.txt","feature_grammar_check_graph.txt","feature_profanity_graph.txt","feature_punct_graph.txt","feature_sentence_length_graph.txt","feature_uppercase_graph.txt","feature_zipf_graph.txt"]
 
+#filenames of features used in k-means clustering
+feature_filenames_cluster = ["feature_acronym.pkl", "feature_emoji.pkl", 
+                        "feature_profanity.pkl", "feature_punct.pkl", \
+                         "feature_zipf.pkl" ]
+num_authors_effective = 6334
 
 # merge graph files
 def merge_graphs(file_list, scalar_list, output_filename):
@@ -712,21 +717,37 @@ def linefit_slope(x, y):
     slope = (((np.mean(x) * np.mean(y)) - np.mean(x*y)) / ((np.mean(x)**2) - np.mean(x**2)))
     return slope
 
-# reads a feature file and generate clusters based on k-means clustering
-def feature_to_cluster(feature_filename, num_clusters):
-    data = load_feature(feature_filename)
-    authors = list(data.keys())
-    points = np.array([])
-    for i in tqdm(range(len(authors))):
-        points = np.append(points, data[authors[i]])
-    points = points.reshape(-1, 1) # because the original data is 1D, reshaping is needed
+# reads feature files and generates clusters based on k-means clustering
+def feature_to_cluster(feature_filenames_cluster, num_clusters):
+    points = np.ndarray((num_authors_effective, len(feature_filenames_cluster))) # rows for authors, columns for features
+    print(points.shape)
+    for j in range(len(feature_filenames_cluster)):
+        feature_data = load_feature(feature_filenames_cluster[j])
+        feature_list = list(feature_data.items())
+        authors = list(feature_data.keys())
+        feature_expon = []
+        for i, val in enumerate(feature_list):
+            feature_expon.append((val[0], 10**(val[1]))) # features are converted to exponential scale for better resolution in distance
+        amin, amax = min(feature_expon,key=lambda tup: tup[1] ), max(feature_expon, key=lambda tup: tup[1])
+        feature_normed = []
+        for i, val in enumerate(feature_expon):
+            if amax[1] == amin[1]: # prevents division by zero
+                feature_normed.append((val[0], val[1]))
+            else:
+                feature_normed.append((val[0], (val[1]-amin[1]) / (amax[1]-amin[1])))
+        for i in tqdm(range(len(authors))):
+            points.itemset((i, j), feature_normed[i][1])
+    points[np.isfinite(points) == False] = 1 # for safety
+    points[np.isnan(points) == True] = 0 # for safety
     kmeans = KMeans(n_clusters = num_clusters)
     kmeans = kmeans.fit(points)
     labels = kmeans.predict(points)
     clusters = {}
     for i in tqdm(range(len(authors))):
-        clusters[authors[i]] = (labels[i],)
-    return clusters
+       clusters[authors[i]] = (labels[i],)
+    kmeans_file = open('kmeans_clusters.pkl', 'wb')
+    pickle.dump(clusters, kmeans_file)
+    kmeans_file.close()
 
 if __name__ == '__main__':
     print("lölölöl")
