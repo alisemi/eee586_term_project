@@ -31,13 +31,13 @@ base_weight = 1
 total_comments = 234694
 
 # Features except ngrams
-feature_file_list = ["feature_acronym.pkl","feature_emoji.pkl","feature_grammar_check.pkl","feature_profanity.pkl","feature_punct.pkl","feature_sentence_length.pkl","feature_uppercase.pkl","feature_zipf.pkl"]
-feature_graph_list = ["feature_acronym_graph.txt","feature_emoji_graph.txt","feature_grammar_check_graph.txt","feature_profanity_graph.txt","feature_punct_graph.txt","feature_sentence_length_graph.txt","feature_uppercase_graph.txt","feature_zipf_graph.txt"]
+feature_file_list = ["features/feature_acronym.pkl","features/feature_emoji.pkl","features/feature_grammar_check.pkl","features/feature_profanity.pkl","features/feature_punct.pkl","features/feature_sentence_length.pkl","features/feature_uppercase.pkl","features/feature_zipf.pkl"]
+feature_graph_list = ["networks/feature_acronym_graph.txt","networks/feature_emoji_graph.txt","networks/feature_grammar_check_graph.txt","networks/feature_profanity_graph.txt","networks/feature_punct_graph.txt","networks/feature_sentence_length_graph.txt","networks/feature_uppercase_graph.txt","networks/feature_zipf_graph.txt"]
 
 #filenames of features used in k-means clustering
-feature_filenames_cluster = ["feature_acronym.pkl", "feature_emoji.pkl", 
-                        "feature_profanity.pkl", "feature_punct.pkl", \
-                         "feature_zipf.pkl" ]
+feature_filenames_cluster = ["features/feature_acronym.pkl", "features/feature_emoji.pkl", 
+                        "features/feature_profanity.pkl", "features/feature_punct.pkl", \
+                         "features/feature_zipf.pkl" ]
 num_authors_effective = 6334
 
 def reorganize_dataset(dataset_filename):
@@ -114,7 +114,7 @@ def create_graphs_from_features(feature_file_list):
    
     
 def feature_to_graph(feature_file):
-    graph_file = open(feature_file[0:-4] + "_graph.txt", "w")
+    graph_file = open("networks/" + feature_file[9:-4] + "_graph.txt", "w")
     feature = load_feature(feature_file)
     feature_list = list(feature.items())
     feature_list.sort(key=lambda tup: tup[1])
@@ -166,7 +166,7 @@ def feature_sentence_length(dataset_filename):
             total_sentence_length = sum(map(lambda x: len(x), sentences))
             author_grammars[author[0]] = total_sentence_length/len(sentences)
     
-    ngrams_file = open('feature_sentence_length.pkl', 'wb')
+    ngrams_file = open('features/feature_sentence_length.pkl', 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
 
@@ -182,7 +182,7 @@ def feature_grammar_check(dataset_filename):
             matches = tool.check(single_text)
             author_grammars[author[0]] = len(matches)/len(sentences)
             
-    ngrams_file = open('feature_grammar_check.pkl', 'wb')
+    ngrams_file = open('features/feature_grammar_check.pkl', 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
 
@@ -190,10 +190,10 @@ class NgramSets:
     pass
 
 def overlapping_ngrams():
-    author_ngrams = load_feature('feature_ngrams.pkl')
-    unigram_file = open("unigram_overlap_network.txt", "w")
-    bigram_file = open("bigram_overlap_network.txt", "w")
-    trigram_file = open("trigram_overlap_network.txt", "w")
+    author_ngrams = load_feature('features/feature_ngrams.pkl')
+    unigram_file = open("networks/unigram_overlap_network.txt", "w")
+    bigram_file = open("networks/bigram_overlap_network.txt", "w")
+    trigram_file = open("networks/trigram_overlap_network.txt", "w")
     authors = list(author_ngrams.keys())
     for i in tqdm(range(len(authors))):
         source_ngrams = author_ngrams[authors[i]]
@@ -257,7 +257,7 @@ def feature_ngrams(dataset_filename):
         author_ngram_sets.trigrams = trigrams_set
         author_ngrams[author[0]] = author_ngram_sets
         
-    ngrams_file = open('feature_ngrams.pkl', 'wb')
+    ngrams_file = open('features/feature_ngrams.pkl', 'wb')
     pickle.dump(author_ngrams, ngrams_file)                      
     ngrams_file.close() 
     
@@ -540,7 +540,7 @@ def connect_db_in_memory(dataset_filename):
 def db_to_graph(dataset_filename):
     conn = connect_db_in_memory(dataset_filename)
     cur = conn.cursor()
-    generate_graph_data(cur, "reddit_casualconversation_network.txt") 
+    generate_graph_data(cur, "networks/reddit_casualconversation_network.txt") 
     if conn:
         conn.close()
 
@@ -552,7 +552,7 @@ def feature_profanity(dataset_filename):
         profanity_rate = predict_prob([single_text])
         author_profanity[author[0]] = profanity_rate[0]
     
-    profanity_file = open('feature_profanity.pkl', 'wb')
+    profanity_file = open('features/feature_profanity.pkl', 'wb')
     pickle.dump(author_profanity, profanity_file)
     profanity_file.close()
            
@@ -571,7 +571,7 @@ def feature_punct(dataset_filename):
         punct_rate = punct_count / character_count
         author_punct[author[0]] = punct_rate
 
-    punct_file = open('feature_punct.pkl', 'wb')
+    punct_file = open('features/feature_punct.pkl', 'wb')
     pickle.dump(author_punct, punct_file)
     punct_file.close()
 
@@ -588,7 +588,7 @@ def feature_emoji(dataset_filename):
         emoji_rate = emoji_count / character_count
         author_emoji[author[0]] = emoji_rate
         
-    emoji_file = open('feature_emoji.pkl', 'wb')
+    emoji_file = open('features/feature_emoji.pkl', 'wb')
     pickle.dump(author_emoji, emoji_file)
     emoji_file.close()
     
@@ -607,7 +607,7 @@ def feature_uppercase(dataset_filename):
         uppercase_rate = uppercase_count / character_count
         author_uppercase[author[0]] = uppercase_rate
         
-    uppercase_file = open('feature_uppercase.pkl', 'wb')
+    uppercase_file = open('features/feature_uppercase.pkl', 'wb')
     pickle.dump(author_uppercase, uppercase_file)
     uppercase_file.close()
 
@@ -635,7 +635,7 @@ def feature_zipf(dataset_filename):
         slope = linefit_slope(np.log(ranks), np.log(freqs))
         author_zipf[author[0]] = slope
         
-    zipf_file = open('feature_zipf.pkl', 'wb')
+    zipf_file = open('features/feature_zipf.pkl', 'wb')
     pickle.dump(author_zipf, zipf_file)
     zipf_file.close()
     
@@ -662,7 +662,7 @@ def feature_acronym(dataset_filename, acronyms_filename):
         acronym_rate = acronym_count / character_count
         author_acronym[author[0]] = acronym_rate
         
-    acronym_file = open('feature_acronym.pkl', 'wb')
+    acronym_file = open('features/feature_acronym.pkl', 'wb')
     pickle.dump(author_acronym, acronym_file)
     acronym_file.close()
     
