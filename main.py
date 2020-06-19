@@ -24,6 +24,7 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 
 dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
+dataset_filename_pkl = "../reddit-comments-may-2015/CasualConversations_sub.pkl"
 acronyms_filename = "./list_acronym.txt"
 recursive_weigh_factor = 1/2
 base_weight = 1
@@ -38,6 +39,26 @@ feature_filenames_cluster = ["feature_acronym.pkl", "feature_emoji.pkl",
                         "feature_profanity.pkl", "feature_punct.pkl", \
                          "feature_zipf.pkl" ]
 num_authors_effective = 6334
+
+def reorganize_dataset(dataset_filename):
+    conn = connect_db_in_memory(dataset_filename)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT author FROM data")
+    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
+    target = ('[deleted]',)
+    distinct_authors.remove(target)
+    new_data = {}
+    for author in tqdm(distinct_authors):
+        cur.execute("SELECT body FROM data WHERE author=?", author)
+        comments = cur.fetchall() #rows holds ids of all comments made by the author
+        if len(comments) > 3:
+            comments = list(map(lambda x: x[0], comments)) 
+            new_data[author] = comments
+    
+    pickle_file = open(dataset_filename[:-3] + '.pkl','wb')
+    pickle.dump(new_data, pickle_file)
+    pickle_file.close()
+
 
 # merge graph files
 def merge_graphs(file_list, scalar_list, output_filename):
@@ -136,58 +157,31 @@ def feature_to_graph(feature_file):
 
 # Gives the average sentence length for each author
 def feature_sentence_length(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_grammars = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() #rows holds ids of all comments made by the author
-        if len(comments) > 3:
-            comments = list(map(lambda x: x[0], comments)) 
-            single_text = ''.join(comments)
-            sentences = nltk.sent_tokenize(single_text)
-            if len(sentences) > 0: # Just a precaution
-                total_sentence_length = sum(map(lambda x: len(x), sentences))
-                author_grammars[author[0]] = total_sentence_length/len(sentences)
-        
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
+    for author in tqdm(author_data):
+        single_text = ''.join(author_data[author])
+        sentences = nltk.sent_tokenize(single_text)
+        if len(sentences) > 0: # Just a precaution
+            total_sentence_length = sum(map(lambda x: len(x), sentences))
+            author_grammars[author[0]] = total_sentence_length/len(sentences)
     
     ngrams_file = open('feature_sentence_length.pkl', 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
 
-
 # Gives the grammar_mistake/sentence for each author
 def feature_grammar_check(dataset_filename):
     tool = language_check.LanguageTool('en-US')
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_grammars = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() #rows holds ids of all comments made by the author
-        if len(comments) > 3:
-            comments = list(map(lambda x: x[0], comments)) 
-            single_text = ''.join(comments)
-            sentences = nltk.sent_tokenize(single_text)
-            if len(sentences) > 0: # Just a precaution
-                matches = tool.check(single_text)
-                author_grammars[author[0]] = len(matches)/len(sentences)
-        
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
-    
+    for author in tqdm(author_data):
+        single_text = ''.join(author_data[author])
+        sentences = nltk.sent_tokenize(single_text)
+        if len(sentences) > 0: # Just a precaution
+            matches = tool.check(single_text)
+            author_grammars[author[0]] = len(matches)/len(sentences)
+            
     ngrams_file = open('feature_grammar_check.pkl', 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
@@ -233,46 +227,36 @@ def load_feature(file_name):
 
 # Note that all ngrams of all authors are kept in memory currently
 def feature_ngrams(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     tokenizer = RegexpTokenizer(r'\w+')
     stop_words = set(stopwords.words('english'))
     author_ngrams = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() #rows holds ids of all comments made by the author
+    for author in tqdm(author_data):
+        comments = author_data[author]
         unigrams_set = set()
         bigrams_set = set()
         trigrams_set = set()
-        if len(comments) > 3:
-            for comment in comments:
-                sentences = nltk.sent_tokenize(comment[0])
-                for sentence in sentences:
-                    sentence = sentence.lower()
-                    tokens = tokenizer.tokenize(sentence)
-                    filtered_sentence = [w for w in tokens if not w in stop_words]
-                    bigrams = ngrams(filtered_sentence, 2)
-                    trigrams = ngrams(filtered_sentence,3)
-                    for unigram in filtered_sentence: #Tokens are alredy unigram
-                        unigrams_set.add(unigram)
-                    for bigram in bigrams:
-                        bigrams_set.add(bigram)
-                    for trigram in trigrams:
-                        trigrams_set.add(trigram)
-             # Now we have a set of ngrams of each author
-            author_ngram_sets = NgramSets()
-            author_ngram_sets.unigrams = unigrams_set
-            author_ngram_sets.bigrams = bigrams_set
-            author_ngram_sets.trigrams = trigrams_set
-            author_ngrams[author[0]] = author_ngram_sets
-
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
+        for comment in comments:
+            sentences = nltk.sent_tokenize(comment[0])
+            for sentence in sentences:
+                sentence = sentence.lower()
+                tokens = tokenizer.tokenize(sentence)
+                filtered_sentence = [w for w in tokens if not w in stop_words]
+                bigrams = ngrams(filtered_sentence, 2)
+                trigrams = ngrams(filtered_sentence,3)
+                for unigram in filtered_sentence: #Tokens are alredy unigram
+                    unigrams_set.add(unigram)
+                for bigram in bigrams:
+                    bigrams_set.add(bigram)
+                for trigram in trigrams:
+                    trigrams_set.add(trigram)
+         # Now we have a set of ngrams of each author
+        author_ngram_sets = NgramSets()
+        author_ngram_sets.unigrams = unigrams_set
+        author_ngram_sets.bigrams = bigrams_set
+        author_ngram_sets.trigrams = trigrams_set
+        author_ngrams[author[0]] = author_ngram_sets
+        
     ngrams_file = open('feature_ngrams.pkl', 'wb')
     pickle.dump(author_ngrams, ngrams_file)                      
     ngrams_file.close() 
@@ -561,43 +545,22 @@ def db_to_graph(dataset_filename):
         conn.close()
 
 def feature_profanity(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0;
+    author_data = load_feature(dataset_filename_pkl)
     author_profanity = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() # rows hold ids of all comments made by the author
-        if (len(comments) < 4):
-            continue
-        comments = list(map(lambda x: x[0], comments)) 
-        single_text = ''.join(comments)
+    for author in tqdm(author_data):
+        single_text = ''.join(author_data[author])
         profanity_rate = predict_prob([single_text])
         author_profanity[author[0]] = profanity_rate[0]
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+    
     profanity_file = open('feature_profanity.pkl', 'wb')
     pickle.dump(author_profanity, profanity_file)
     profanity_file.close()
            
 def feature_punct(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_punct = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() # rows hold ids of all comments made by the author
-        if (len(comments) < 4):
-            continue
+    for author in tqdm(author_data):
+        comments = author_data[author]
         punct_count = 0
         character_count = 0
         for comment in comments:
@@ -607,26 +570,16 @@ def feature_punct(dataset_filename):
                 character_count += len(comment[0])
         punct_rate = punct_count / character_count
         author_punct[author[0]] = punct_rate
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+
     punct_file = open('feature_punct.pkl', 'wb')
     pickle.dump(author_punct, punct_file)
     punct_file.close()
 
 def feature_emoji(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_emoji = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() # rows hold ids of all comments made by the author
-        if (len(comments) < 4):
-            continue
+    for author in tqdm(author_data):
+        comments = comments = author_data[author]
         emoji_count = 0;
         character_count = 0;
         for comment in comments:
@@ -634,26 +587,16 @@ def feature_emoji(dataset_filename):
             character_count += len(comment[0])
         emoji_rate = emoji_count / character_count
         author_emoji[author[0]] = emoji_rate
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+        
     emoji_file = open('feature_emoji.pkl', 'wb')
     pickle.dump(author_emoji, emoji_file)
     emoji_file.close()
     
 def feature_uppercase(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
-    target =('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_uppercase = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() # rows hold ids of all comments made by the author
-        if (len(comments) < 4):
-            continue
+    for author in tqdm(author_data):
+        comments = comments = author_data[author]
         uppercase_count = 0
         character_count = 0
         for comment in comments:
@@ -663,28 +606,18 @@ def feature_uppercase(dataset_filename):
                 character_count += len(comment[0])
         uppercase_rate = uppercase_count / character_count
         author_uppercase[author[0]] = uppercase_rate
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+        
     uppercase_file = open('feature_uppercase.pkl', 'wb')
     pickle.dump(author_uppercase, uppercase_file)
     uppercase_file.close()
 
 def feature_zipf(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall() # fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     author_zipf = {}
     tokenizer = RegexpTokenizer(r'\w+')
     stop_words = set(stopwords.words('english'))
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall() # rows hold ids of all comments made by the author
-        if (len(comments) < 4):
-            continue
+    for author in tqdm(author_data):
+        comments = comments = author_data[author]
         fd = FreqDist()
         for comment in comments:
             sentences = nltk.sent_tokenize(comment[0])
@@ -701,44 +634,34 @@ def feature_zipf(dataset_filename):
             freqs = np.append(freqs, fd[word])
         slope = linefit_slope(np.log(ranks), np.log(freqs))
         author_zipf[author[0]] = slope
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+        
     zipf_file = open('feature_zipf.pkl', 'wb')
     pickle.dump(author_zipf, zipf_file)
     zipf_file.close()
     
 def feature_acronym(dataset_filename, acronyms_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
-    distinct_authors = cur.fetchall()
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    comments_sum = 0
+    author_data = load_feature(dataset_filename_pkl)
     acronym_count = 0
     character_count = 0
     tokenizer = RegexpTokenizer(r'\w+')
     author_acronym = {}
     acronyms = open(acronyms_filename).read().splitlines()
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
-        comments = cur.fetchall()
-        if (len(comments) > 3):
-            for comment in comments:
-                sentences = nltk.sent_tokenize(comment[0])
-                for sentence in sentences:
-                    sentence = sentence.lower()
-                    tokens = tokenizer.tokenize(sentence)
-                    if "tl&dr" in sentence or "tl;dr" in sentence:
+    for author in tqdm(author_data):
+        comments = author_data[author]
+        for comment in comments:
+            sentences = nltk.sent_tokenize(comment[0])
+            for sentence in sentences:
+                sentence = sentence.lower()
+                tokens = tokenizer.tokenize(sentence)
+                if "tl&dr" in sentence or "tl;dr" in sentence:
+                    acronym_count += 1
+                for token in tokens:
+                    if token in acronyms:
                         acronym_count += 1
-                    for token in tokens:
-                        if token in acronyms:
-                            acronym_count += 1
-                character_count += len(comment[0])
-            acronym_rate = acronym_count / character_count
-            author_acronym[author[0]] = acronym_rate
-            comments_sum += len(comments)
-            print("\n" + str((comments_sum / total_comments)*100) + "% of total main comments are processed.")
+            character_count += len(comment[0])
+        acronym_rate = acronym_count / character_count
+        author_acronym[author[0]] = acronym_rate
+        
     acronym_file = open('feature_acronym.pkl', 'wb')
     pickle.dump(author_acronym, acronym_file)
     acronym_file.close()
