@@ -16,7 +16,6 @@ import statistics
 
 recursive_weigh_factor = 1/2
 base_weight = 1
-total_comments = 234694
 
 # merge graph files
 def merge_graphs(file_list, scalar_list, output_filename):
@@ -35,11 +34,14 @@ def merge_graphs(file_list, scalar_list, output_filename):
         g.write_ncol(output_filename)
     os.remove("temp_graph.txt")
     normalize_graph(output_filename)
+    return output_filename
 
 
 def normalize_graph(graph_filename):
     graph_file = open(graph_filename)
     line = graph_file.readline() 
+    if not line: # Graph is empty, no need to normalize
+        return
     max_val = float(line.split()[2])
     min_val = 0.0
     while True:     
@@ -67,12 +69,15 @@ def normalize_graph(graph_filename):
     
     
 def create_graphs_from_features(feature_file_list):
+    graph_files = []
     for file_name in tqdm(feature_file_list):
-        feature_to_graph(file_name)
+        graph_files.append(feature_to_graph(file_name))
+    return graph_files
    
     
 def feature_to_graph(feature_file):
-    graph_file = open("networks/" + feature_file[9:-4] + "_graph.txt", "w")
+    graph_filename = "networks/" + os.path.basename(feature_file)[:-4] + "_graph.txt"
+    graph_file = open(graph_filename, "w")
     feature = utils.load_feature(feature_file)
     feature_list = list(feature.items())
     feature_list.sort(key=lambda tup: tup[1])
@@ -81,10 +86,14 @@ def feature_to_graph(feature_file):
     # Setting the log scale
     feature_logged = []
     # Get the smallest value after 0
+    smallest = 0
     for val in feature_list:
         if val[1] > 0:
             smallest = val
             break
+    if smallest == 0: # It means that every author has 0 value
+        return graph_filename # Then return empty graph
+        
     for i, val in enumerate(feature_list):
         if val[1] > 0:
             feature_logged.append((val[0], math.log10(val[1])))
@@ -111,13 +120,17 @@ def feature_to_graph(feature_file):
         # Write the edges to file
         for edge in edges:    
             print(feature_normed[i][0] + " " + edge[0] + " " + str(edge[1]), file=graph_file) 
+    return graph_filename
     
 
-def overlapping_ngrams():
-    author_ngrams = utils.load_feature('features/feature_ngrams.pkl')
-    unigram_file = open("networks/unigram_overlap_network.txt", "w")
-    bigram_file = open("networks/bigram_overlap_network.txt", "w")
-    trigram_file = open("networks/trigram_overlap_network.txt", "w")
+def overlapping_ngrams(ngram_feature_filename):
+    author_ngrams = utils.load_feature(ngram_feature_filename)
+    unigram_filename = "networks/" + os.path.basename(ngram_feature_filename)[:-4] + "_unigram_overlap_graph.txt"
+    bigram_filename = "networks/" + os.path.basename(ngram_feature_filename)[:-4] + "_bigram_overlap_graph.txt"
+    trigram_filename = "networks/" + os.path.basename(ngram_feature_filename)[:-4] + "_trigram_overlap_graph.txt" 
+    unigram_file = open(unigram_filename, "w")
+    bigram_file = open(bigram_filename, "w")
+    trigram_file = open(trigram_filename, "w")
     authors = list(author_ngrams.keys())
     for i in tqdm(range(len(authors))):
         source_ngrams = author_ngrams[authors[i]]
@@ -140,7 +153,9 @@ def overlapping_ngrams():
                     print(authors[i] + " " + authors[j] + " " + str(trigram_ratio), file=trigram_file) 
     unigram_file.close()
     bigram_file.close()
-    trigram_file.close()         
+    trigram_file.close()
+    return [unigram_filename, bigram_filename, trigram_filename]
+             
     
 def draw_graph_clusters(cluster_obj, output_filename):
     visual_style = dict()
@@ -159,16 +174,14 @@ def scale_graph(graph_filename, scale):
     
 
 
-def remove_unused_authors(graph_filename, output_filename, dataset_filename):
-    conn = utils.connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
+def remove_unused_authors(graph_filename, output_filename, cur):
+    cur.execute("SELECT DISTINCT author FROM " + utils.table_name)
     distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
     target = ('[deleted]',)
     distinct_authors.remove(target)
     our_authors = []
     for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
+        cur.execute("SELECT body FROM " + utils.table_name + " WHERE author=?", author)
         comments = cur.fetchall() #rows holds ids of all comments made by the author
         if len(comments) > 3:
             our_authors.append(author)
@@ -196,12 +209,15 @@ def remove_unused_authors(graph_filename, output_filename, dataset_filename):
 def community_detection(graph_file):
     print("Reading the graph file...")
     normalize_graph(graph_file)
-    scale_graph(graph_file,1000) # Related to a bug in igraph
+    scale_graph(graph_file,1000) # Related to a bug in igraph        
     g = ig.Graph.Read_Ncol(graph_file,directed=False)
+    communities = {}
+    if not g: # If this is an empty graph
+        return communities
     g.simplify(combine_edges='sum')
     
     print("Running Community Detection Algorithms...")
-    communities = {}
+    
         
     # Walktrap Method, time O(mn^2) and space O(n^2) in the worst case
     '''
@@ -246,12 +262,14 @@ def community_detection(graph_file):
     print("Label Propogation is done...")
     
     # Newman's eigenvector
+    '''
     print("Newman's EigenVector is running...")
     clusters = g.community_leading_eigenvector(weights=g.es["weight"])
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
     print("Newman's EigenVector is done...")
+    '''
         
     print("Multi level clustering is running...")
     # Multi level clustering algorithm
@@ -264,7 +282,7 @@ def community_detection(graph_file):
 
 def recursive_parenting(cur, edges, comment_id, weight):
     # Get the author and parent id of the comment
-    cur.execute("SELECT author,parent_id FROM data WHERE name=?", comment_id)
+    cur.execute("SELECT author,parent_id FROM " + utils.table_name + " WHERE name=?", comment_id)
     parent_comment = cur.fetchall() 
     if weight*recursive_weigh_factor<0.05: # For efficieny 
         return
@@ -280,13 +298,12 @@ def recursive_parenting(cur, edges, comment_id, weight):
 # cur is cursor object from the database connection
 def generate_graph_data(cur, graph_file_name):
     graph_file = open(graph_file_name, "w")
-    cur.execute("SELECT DISTINCT author FROM data")
+    cur.execute("SELECT DISTINCT author FROM " + utils.table_name)
     distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
     target = ('[deleted]',)
     distinct_authors.remove(target)
-    comments_sum = 0
     for author in tqdm(distinct_authors):
-        cur.execute("SELECT name,parent_id FROM data WHERE author=?", author)
+        cur.execute("SELECT name,parent_id FROM " + utils.table_name + " WHERE author=?", author)
         comments = cur.fetchall() #rows holds ids of all comments made by the author
         if len(comments) > 3:     
             edges = {} # Edges for the current author
@@ -299,14 +316,14 @@ def generate_graph_data(cur, graph_file_name):
             edges.pop("[deleted]", None) #delete the edge of author to the [deleted] authors
             for key,val in edges.items():
                 print(author[0] + " " + key + " " + str(val), file=graph_file)
-        comments_sum += len(comments)
-        print("\n" + str((comments_sum/total_comments)*100) + "% of total main comments are processed.")
-    
     graph_file.close()
+    remove_unused_authors(graph_file_name, graph_file_name[:-4] + "_processed.txt", cur )
+    os.remove(graph_file_name)
+    os.rename(graph_file_name[:-4] + "_processed.txt", graph_file_name)
     
-def db_to_graph(dataset_filename):
+def db_to_graph(dataset_filename, graph_filename):
     conn = utils.connect_db_in_memory(dataset_filename)
     cur = conn.cursor()
-    generate_graph_data(cur, "networks/reddit_casualconversation_network.txt") 
+    generate_graph_data(cur, graph_filename) 
     if conn:
         conn.close()

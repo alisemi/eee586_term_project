@@ -8,25 +8,29 @@ import collections
 from sklearn import metrics
 import matplotlib.pyplot as plt
 
+table_name = 'data'
 
 def reorganize_dataset(dataset_filename):
     conn = connect_db_in_memory(dataset_filename)
     cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM data")
+    cur.execute("SELECT DISTINCT author FROM " + table_name)
     distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
     target = ('[deleted]',)
     distinct_authors.remove(target)
     new_data = {}
     for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM data WHERE author=?", author)
+        cur.execute("SELECT body FROM " + table_name + " WHERE author=?", author)
         comments = cur.fetchall() #rows holds ids of all comments made by the author
         if len(comments) > 3:
             comments = list(map(lambda x: x[0], comments)) 
             new_data[author] = comments
     
-    pickle_file = open(dataset_filename[:-3] + '.pkl','wb')
+    new_dataset_name = dataset_filename[:-3] + '.pkl'
+    pickle_file = open(new_dataset_name,'wb')
     pickle.dump(new_data, pickle_file)
     pickle_file.close()
+    return new_dataset_name
+    
     
 def connect_db_in_memory(dataset_filename):
     # Dataset is an sqlite Databse
@@ -45,6 +49,8 @@ def connect_db_in_memory(dataset_filename):
 # Evalutaes the clusters based on a number of metrics, communities1 is the ground truth
 # Refer to https://scikit-learn.org/stable/modules/clustering.html#clustering-performance-evaluation
 def evaluate(communities1, communities2, number_of_algorithms):
+    if not communities2:
+        return None
     c1 = communities1.copy()
     c2 = communities2.copy()
     
@@ -118,6 +124,7 @@ def load_feature(file_name):
     return db
 
 
+# For evaluations othher than single clustering algorithms on linguistic data, such as k-means
 def evaluate_cluster_to_community(communities,clusters,number_of_algorithms):
     c1 = communities.copy()
     c2 = clusters.copy()
@@ -151,9 +158,11 @@ def evaluate_cluster_to_community(communities,clusters,number_of_algorithms):
 def plot_results(evaluations, cluster_name,file_name):
     #x= ["Adjusted Rand Index", "Adjusted Mutual Information", "V-measure","Fowlkes-Mallows Index"]
     x= ["ARI", "AMI", "V-measure","FMI"]
-    community_algorithms = ["Fast Greedy","Leiden","Label Propogation","Newman's EigenVector","Multi-level Clustering"]
+    community_algorithms = ["Fast Greedy","Leiden","Label Propogation",'''"Newman's EigenVector"''',"Multi-level Clustering"]
     
-    for i in range(len(community_algorithms)):
+    if not evaluations:
+        return
+    for i in range(len(evaluations)):
         plt.plot(x,list(evaluations[i]),label = community_algorithms[i])
     
     plt.title("Evaluations for " + cluster_name) 

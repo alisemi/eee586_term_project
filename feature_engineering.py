@@ -13,6 +13,7 @@ import utils
 import numpy as np
 import string
 import re
+import os
 
 # Gives the average sentence length for each author
 def feature_sentence_length(dataset_filename_pkl):
@@ -25,9 +26,11 @@ def feature_sentence_length(dataset_filename_pkl):
             total_sentence_length = sum(map(lambda x: len(x), sentences))
             author_grammars[author[0]] = total_sentence_length/len(sentences)
     
-    ngrams_file = open('features/feature_sentence_length.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_sentence_length.pkl'
+    ngrams_file = open(feature_filename, 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
+    return feature_filename
     
 
 # Gives the grammar_mistake/sentence for each author
@@ -42,9 +45,11 @@ def feature_grammar_check(dataset_filename_pkl):
             matches = tool.check(single_text)
             author_grammars[author[0]] = len(matches)/len(sentences)
             
-    ngrams_file = open('features/feature_grammar_check.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_grammar_check.pkl'
+    ngrams_file = open(feature_filename, 'wb')
     pickle.dump(author_grammars, ngrams_file)                      
     ngrams_file.close()
+    return feature_filename
     
  
 class NgramSets:
@@ -82,9 +87,11 @@ def feature_ngrams(dataset_filename_pkl):
         author_ngram_sets.trigrams = trigrams_set
         author_ngrams[author[0]] = author_ngram_sets
         
-    ngrams_file = open('features/feature_ngrams.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_ngrams.pkl'
+    ngrams_file = open(feature_filename, 'wb')
     pickle.dump(author_ngrams, ngrams_file)                      
     ngrams_file.close()
+    return feature_filename
     
 def feature_profanity(dataset_filename_pkl):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -94,9 +101,11 @@ def feature_profanity(dataset_filename_pkl):
         profanity_rate = predict_prob([single_text])
         author_profanity[author[0]] = profanity_rate[0]
     
-    profanity_file = open('features/feature_profanity.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_profanity.pkl'
+    profanity_file = open(feature_filename, 'wb')
     pickle.dump(author_profanity, profanity_file)
     profanity_file.close()
+    return feature_filename
            
 def feature_punct(dataset_filename_pkl):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -113,9 +122,11 @@ def feature_punct(dataset_filename_pkl):
         punct_rate = punct_count / character_count
         author_punct[author[0]] = punct_rate
 
-    punct_file = open('features/feature_punct.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_punct.pkl'
+    punct_file = open(feature_filename, 'wb')
     pickle.dump(author_punct, punct_file)
     punct_file.close()
+    return feature_filename
 
 def feature_emoji(dataset_filename_pkl):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -130,9 +141,11 @@ def feature_emoji(dataset_filename_pkl):
         emoji_rate = emoji_count / character_count
         author_emoji[author[0]] = emoji_rate
         
-    emoji_file = open('features/feature_emoji.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_emoji.pkl'
+    emoji_file = open(feature_filename, 'wb')
     pickle.dump(author_emoji, emoji_file)
     emoji_file.close()
+    return feature_filename
     
 def feature_uppercase(dataset_filename_pkl):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -149,9 +162,11 @@ def feature_uppercase(dataset_filename_pkl):
         uppercase_rate = uppercase_count / character_count
         author_uppercase[author[0]] = uppercase_rate
         
-    uppercase_file = open('features/feature_uppercase.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_uppercase.pkl'
+    uppercase_file = open(feature_filename, 'wb')
     pickle.dump(author_uppercase, uppercase_file)
     uppercase_file.close()
+    return feature_filename
 
 def feature_zipf(dataset_filename_pkl):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -177,9 +192,11 @@ def feature_zipf(dataset_filename_pkl):
         slope = linefit_slope(np.log(ranks), np.log(freqs))
         author_zipf[author[0]] = slope
         
-    zipf_file = open('features/feature_zipf.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_zipf.pkl'
+    zipf_file = open(feature_filename, 'wb')
     pickle.dump(author_zipf, zipf_file)
     zipf_file.close()
+    return feature_filename
     
 def feature_acronym(dataset_filename_pkl, acronyms_filename):
     author_data = utils.load_feature(dataset_filename_pkl)
@@ -204,12 +221,31 @@ def feature_acronym(dataset_filename_pkl, acronyms_filename):
         acronym_rate = acronym_count / character_count
         author_acronym[author[0]] = acronym_rate
         
-    acronym_file = open('features/feature_acronym.pkl', 'wb')
+    feature_filename = 'features/' + os.path.basename(dataset_filename_pkl)[:-4] + '_feature_acronym.pkl'
+    acronym_file = open(feature_filename, 'wb')
     pickle.dump(author_acronym, acronym_file)
     acronym_file.close()
+    return feature_filename
     
 
 # calculates the slope of the best-fitting line
 def linefit_slope(x, y):
     slope = (((np.mean(x) * np.mean(y)) - np.mean(x*y)) / ((np.mean(x)**2) - np.mean(x**2)))
     return slope
+
+# First one is ngrams, it is kind of special for graph construction
+def extract_features(dataset_filename):
+    # Generate pickle file for faster construction
+    dataset_filename_pkl = utils.reorganize_dataset(dataset_filename)
+    feature_filenames = []
+    feature_filenames.append(feature_ngrams(dataset_filename_pkl))
+    feature_filenames.append(feature_acronym(dataset_filename_pkl, 'list_acronym.txt'))
+    feature_filenames.append(feature_uppercase(dataset_filename_pkl))
+    feature_filenames.append(feature_emoji(dataset_filename_pkl))
+    feature_filenames.append(feature_punct(dataset_filename_pkl))
+    feature_filenames.append(feature_profanity(dataset_filename_pkl))
+    feature_filenames.append(feature_grammar_check(dataset_filename_pkl))
+    feature_filenames.append(feature_sentence_length(dataset_filename_pkl))
+    feature_filenames.append(feature_zipf(dataset_filename_pkl))
+    return feature_filenames
+    
