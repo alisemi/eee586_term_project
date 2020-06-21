@@ -140,7 +140,7 @@ def das_experiment(dataset_filename, network_filename):
     cluster_names = ['K-means']
     for i, cluster in enumerate(clusters):
         evaluations = utils.evaluate_cluster_to_community(ground_truth_community, cluster, 4)
-        utils.plot_results(evaluations,cluster_names[i], "results/result_" + cluster_names[i].replace(" ", "_") + ".png")
+        utils.plot_results(evaluations,cluster_names[i], "results/" + os.path.basename(dataset_filename)[:-4] + "result_" + cluster_names[i].replace(" ", "_") + ".png")
 
 
 
