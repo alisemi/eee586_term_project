@@ -207,14 +207,13 @@ def remove_unused_authors(graph_filename, output_filename, cur):
     
 
 def community_detection(graph_file):
-    print("Reading the graph file...")
-    normalize_graph(graph_file)
-    scale_graph(graph_file,1000) # Related to a bug in igraph        
+    print("Reading the graph file...")  
     g = ig.Graph.Read_Ncol(graph_file,directed=False)
     communities = {}
     if not g: # If this is an empty graph
         return communities
     g.simplify(combine_edges='sum')
+    g = g.components().giant()
     
     print("Running Community Detection Algorithms...")
     
@@ -239,7 +238,7 @@ def community_detection(graph_file):
         
     print("Leiden is running...")
     # Leiden, TODO parameters
-    clusters = dendogram = g.community_leiden(weights=g.es["weight"], n_iterations=4)
+    clusters = g.community_leiden(weights=g.es["weight"], n_iterations=4)
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],) 
@@ -278,7 +277,7 @@ def community_detection(graph_file):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
     print("Multi level clustering is done...")
       
-    return communities
+    return communities, g.vs["name"]
 
 def recursive_parenting(cur, edges, comment_id, weight):
     # Get the author and parent id of the comment
@@ -296,7 +295,7 @@ def recursive_parenting(cur, edges, comment_id, weight):
         
 
 # cur is cursor object from the database connection
-def generate_graph_data(cur, graph_file_name):
+def generate_graph_data(cur, graph_file_name, parenting):
     graph_file = open(graph_file_name, "w")
     cur.execute("SELECT DISTINCT author FROM " + utils.table_name)
     distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
@@ -308,8 +307,15 @@ def generate_graph_data(cur, graph_file_name):
         if len(comments) > 3:     
             edges = {} # Edges for the current author
             for comment in comments:
-                # Recursively look parent author of the commment and parent of parents to make connections
-                recursive_parenting(cur,edges,(comment[1],),base_weight)
+                if parenting:
+                    # Recursively look parent author of the commment and parent of parents to make connections
+                    recursive_parenting(cur,edges,(comment[1],),base_weight)
+                else:
+                    cur.execute("SELECT author,parent_id FROM " + utils.table_name + " WHERE name=?", (comment[1],))
+                    parent_comment = cur.fetchall()
+                    if parent_comment:
+                        parent_comment = parent_comment[0]
+                        edges[parent_comment[0]] = edges.get(parent_comment[0], 0) + 1
                 # TODO how about authors making comment onto the same comment, does it needed?
             #All edges belonging to the current author are added, now append it to the file
             edges.pop(author[0], None) #delete the edge of author to itself(sub comment of their own comments)
@@ -320,10 +326,13 @@ def generate_graph_data(cur, graph_file_name):
     remove_unused_authors(graph_file_name, graph_file_name[:-4] + "_processed.txt", cur )
     os.remove(graph_file_name)
     os.rename(graph_file_name[:-4] + "_processed.txt", graph_file_name)
+    normalize_graph(graph_file_name)
+    scale_graph(graph_file_name,1000) # Related to a bug in igraph      
     
-def db_to_graph(dataset_filename, graph_filename):
-    conn = utils.connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    generate_graph_data(cur, graph_filename) 
-    if conn:
-        conn.close()
+def db_to_graph(dataset_filename, graph_filename, parenting=True):
+    if not os.path.isfile(graph_filename):
+        conn = utils.connect_db_in_memory(dataset_filename)
+        cur = conn.cursor()
+        generate_graph_data(cur, graph_filename, parenting) 
+        if conn:
+            conn.close()

@@ -26,12 +26,6 @@ import utils
 import feature_engineering
 import graph_engineering
 
-dataset_filename = "../reddit-comments-may-2015/CasualConversations_sub.db"
-dataset_filename_pkl = "../reddit-comments-may-2015/CasualConversations_sub.pkl"
-acronyms_filename = "./list_acronym.txt"
-recursive_weigh_factor = 1/2
-base_weight = 1
-total_comments = 234694
 
 # Features except ngrams
 #feature_file_list = ["features/feature_acronym.pkl","features/feature_emoji.pkl","features/feature_grammar_check.pkl","features/feature_profanity.pkl","features/feature_punct.pkl","features/feature_sentence_length.pkl","features/feature_uppercase.pkl","features/feature_zipf.pkl"]
@@ -60,16 +54,16 @@ feature_filenames_cluster = ["features/feature_acronym.pkl", "features/feature_e
 def feature_to_cluster(feature_filenames_cluster, num_clusters):    
     num_authors_effective = len(utils.load_feature(feature_filenames_cluster[0]))
     points = np.ndarray((num_authors_effective, len(feature_filenames_cluster))) # rows for authors, columns for features
-    print(points.shape)
     for j in range(len(feature_filenames_cluster)):
-        print(feature_filenames_cluster[j])
         feature_data = utils.load_feature(feature_filenames_cluster[j])
         feature_list = list(feature_data.items())
         authors = list(feature_data.keys())
         feature_expon = []
         for i, val in enumerate(feature_list):
-            feature_expon.append((val[0], 10**(val[1]))) # features are converted to exponential scale for better resolution in distance
+            #feature_expon.append((val[0], 10**(val[1]))) # features are converted to exponential scale for better resolution in distance
+            feature_expon.append((val[0], val[1]))
         amin, amax = min(feature_expon,key=lambda tup: tup[1] ), max(feature_expon, key=lambda tup: tup[1])
+        
         feature_normed = []
         for i, val in enumerate(feature_expon):
             if amax[1] == amin[1]: # prevents division by zero
@@ -92,59 +86,37 @@ def feature_to_cluster(feature_filenames_cluster, num_clusters):
     return clusters
 
 
-def das_experiment(dataset_filename, network_filename):
-    # Non-linguistic Graph Construction
-    print('Non-linguistic Graph Construction...')
-    graph_engineering.db_to_graph(dataset_filename, network_filename)   
+def new_experiment(dataset_filename, network_filename):
+    dataset_filename = '../reddit-comments-may-2015/TipOfMyTongue_sub.db'
+    network_filename = 'TipOfMyTongue_sub_network_Dec_2020.txt'
+    graph_engineering.db_to_graph(dataset_filename, network_filename, parenting=False)
     
+    print('Community detection...')
+    topological_community,used_authors = graph_engineering.community_detection(network_filename)
+
     # Feature Extraction
     print('Feature Extraction....')
-    feature_file_list = feature_engineering.extract_features(dataset_filename)
-    
-    # Linguistic Graph Construction
-    print('Linguistic Graph Construction...')
-    graph_files = []
-    graph_files.extend(graph_engineering.overlapping_ngrams(feature_file_list[0]))
-    graph_files.extend(graph_engineering.create_graphs_from_features(feature_file_list[1:]))
-    
-    # Merge Graphs
-    print('Merging the desired graphs..(You should write down the code for that)')  
-    graph_files.append(graph_engineering.merge_graphs(graph_files[0:3],[0.33,0.33,0.33], 'networks/TipOfMyTongue_sub_ngram_merged_graph.txt' ))
-    graph_files.append(graph_engineering.merge_graphs(graph_files[4:11],[1,1,1,1,1,1,1],'networks/TipOfMyTongue_sub_style_merged_graph.txt')) 
-    
-    # Communities
-    print('Communitiy Detection....')
-    ground_truth_community = graph_engineering.community_detection(network_filename)
-    communities = []
-    
-    for graph_file in graph_files:
-        current_communitiy = graph_engineering.community_detection(graph_file)
-        communities.append(current_communitiy)
-        
+    feature_file_list = feature_engineering.extract_features(dataset_filename,used_authors)
+
     # Cluster communities
+    # TODO different community detection algorithms
+    # TODO number of clusters based on how many communities
+    print('Cluster communities...')
     clusters = []
-    #clusters.append(feature_to_cluster(feature_file_list[1:8], 15, utils.num_authors_effective))
+    clusters.append(feature_to_cluster(feature_file_list[1:8], 200))
     
     # Evaluation
     print('Evaluations.....')
-    community_names = ['Unigram Feature Only', 'Bigram Feature Only', 'Trigram Feature Only',
-                       'Acronym Feature Only', 'Zipf\'s Law Feature Only',
-                       'Uppercase Feature Only', 'Emoji Feature Only',
-                       'Punctuation Feature Only','Profanity Feature Only',
-                       'Grammar Feature Only', 'Sentence Length Feature Only',
-                       'Ngram Features', 'Style Features']
-    for i,community in enumerate(communities):
-        evaluations = utils.evaluate(ground_truth_community, community, 4)
-        utils.plot_results(evaluations,community_names[i], "results/result_" + community_names[i].replace(" ", "_") + ".png")
-    
     cluster_names = ['K-means']
     for i, cluster in enumerate(clusters):
-        evaluations = utils.evaluate_cluster_to_community(ground_truth_community, cluster, 4)
-        utils.plot_results(evaluations,cluster_names[i], "results/" + os.path.basename(dataset_filename)[:-4] + "result_" + cluster_names[i].replace(" ", "_") + ".png")
-
+        evaluations = utils.evaluate_cluster_to_community(topological_community, cluster, 4)
+        utils.plot_results(evaluations,cluster_names[i], "results/" + os.path.basename(dataset_filename)[:-3] + "_result_" + cluster_names[i].replace(" ", "_") + ".png")
 
 
 if __name__ == '__main__':
     print("This file contains a collection of functions intended to be used in Spyder environment for the project of the course EEE 586: Statistical Foundations of Natural Language Processing in Bilkent University, Spring 2020.")
     utils.table_name = "TipOfMyTongue_sub"
-    das_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue.txt')
+    #graph_engineering.db_to_graph("../reddit-comments-may-2015/TipOfMyTongue_sub.db","TipOfMyTongue_sub_network_Dec_2020.txt",False)
+    new_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue_sub_network_Dec_2020.txt')
+    
+    

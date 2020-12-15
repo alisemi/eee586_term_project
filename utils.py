@@ -7,28 +7,27 @@ from sqlite3 import Error
 import collections
 from sklearn import metrics
 import matplotlib.pyplot as plt
+import os
 
 table_name = 'data'
 
-def reorganize_dataset(dataset_filename):
-    conn = connect_db_in_memory(dataset_filename)
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT author FROM " + table_name)
-    distinct_authors = cur.fetchall() # Fetchall returns a tuple ("author_name",)
-    target = ('[deleted]',)
-    distinct_authors.remove(target)
-    new_data = {}
-    for author in tqdm(distinct_authors):
-        cur.execute("SELECT body FROM " + table_name + " WHERE author=?", author)
-        comments = cur.fetchall() #rows holds ids of all comments made by the author
-        if len(comments) > 3:
+def reorganize_dataset(dataset_filename,used_authors):
+    new_dataset_name = dataset_filename[:-3] + '.pkl'
+    if not os.path.isfile(new_dataset_name):
+        conn = connect_db_in_memory(dataset_filename)
+        cur = conn.cursor()
+        distinct_authors = used_authors
+        
+        new_data = {}
+        for author in tqdm(distinct_authors):
+            cur.execute("SELECT body FROM " + table_name + " WHERE author=?", (author,))
+            comments = cur.fetchall() #rows holds ids of all comments made by the author
             comments = list(map(lambda x: x[0], comments)) 
             new_data[author] = comments
-    
-    new_dataset_name = dataset_filename[:-3] + '.pkl'
-    pickle_file = open(new_dataset_name,'wb')
-    pickle.dump(new_data, pickle_file)
-    pickle_file.close()
+        
+        pickle_file = open(new_dataset_name,'wb')
+        pickle.dump(new_data, pickle_file)
+        pickle_file.close()
     return new_dataset_name
     
     
