@@ -13,6 +13,7 @@ import fileinput
 import utils
 import math
 import statistics
+import itertools
 
 recursive_weigh_factor = 1/2
 base_weight = 1
@@ -294,6 +295,30 @@ def recursive_parenting(cur, edges, comment_id, weight):
         recursive_parenting(cur,edges,(parent_comment[1],),weight*recursive_weigh_factor)
         
 
+# No parenting, more sql
+def generate_graph_data_sql(cur,graph_file_name):
+   graph_file = open(graph_file_name, "w")
+   comment_count = 20
+   #sql = 'SELECT author FROM ' + utils.table_name + ' GROUP BY author HAVING COUNT(*) > ' + str(comment_count) + " AND author IS NOT '[deleted]'"
+   #sql2 = 'SELECT name,parent_id FROM ' + utils.table_name + ' WHERE author IN (' + sql + ')'
+   #cur.execute(sql2)
+   sql6 = ("WITH our_authors AS (SELECT author FROM " + utils.table_name + " GROUP BY author HAVING COUNT(*) > " + 
+           str(comment_count) + " AND author IS NOT '[deleted]') SELECT replier.author, host.author FROM " +
+           utils.table_name + " host INNER JOIN " + utils.table_name + " replier ON replier.parent_id = host.name " 
+           "WHERE replier.author IN our_authors AND host.author IN our_authors")
+   cur.execute(sql6)
+   connections = cur.fetchall()
+   authors = [(key, [num for _, num in value]) for key, value in itertools.groupby(connections, lambda x: x[0])]
+   for author in authors:
+       edges = {}
+       for neighbor in author[1]:
+           edges[neighbor] = edges.get(neighbor, 0) + 1
+       for key,val in edges.items():
+           print(author[0] + " " + key + " " + str(val), file=graph_file)
+   graph_file.close()
+   normalize_graph(graph_file_name)
+   scale_graph(graph_file_name,1000) # Related to a bug in igraph 
+
 # cur is cursor object from the database connection
 def generate_graph_data(cur, graph_file_name, parenting):
     graph_file = open(graph_file_name, "w")
@@ -304,7 +329,7 @@ def generate_graph_data(cur, graph_file_name, parenting):
     for author in tqdm(distinct_authors):
         cur.execute("SELECT name,parent_id FROM " + utils.table_name + " WHERE author=?", author)
         comments = cur.fetchall() #rows holds ids of all comments made by the author
-        if len(comments) > 3:     
+        if len(comments) > 100:     
             edges = {} # Edges for the current author
             for comment in comments:
                 if parenting:
@@ -333,6 +358,7 @@ def db_to_graph(dataset_filename, graph_filename, parenting=True):
     if not os.path.isfile(graph_filename):
         conn = utils.connect_db_in_memory(dataset_filename)
         cur = conn.cursor()
-        generate_graph_data(cur, graph_filename, parenting) 
+        #generate_graph_data(cur, graph_filename, False) 
+        generate_graph_data_sql(cur, graph_filename) 
         if conn:
             conn.close()

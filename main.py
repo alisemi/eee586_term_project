@@ -93,6 +93,7 @@ def new_experiment(dataset_filename, network_filename):
     
     print('Community detection...')
     topological_community,used_authors = graph_engineering.community_detection(network_filename)
+    print('Used authors : ' + str(used_authors))
 
     # Feature Extraction
     print('Feature Extraction....')
@@ -103,7 +104,7 @@ def new_experiment(dataset_filename, network_filename):
     # TODO number of clusters based on how many communities
     print('Cluster communities...')
     clusters = []
-    clusters.append(feature_to_cluster(feature_file_list[1:8], 200))
+    clusters.append(feature_to_cluster(feature_file_list[1:8], 100))
     
     # Evaluation
     print('Evaluations.....')
@@ -117,6 +118,6 @@ if __name__ == '__main__':
     print("This file contains a collection of functions intended to be used in Spyder environment for the project of the course EEE 586: Statistical Foundations of Natural Language Processing in Bilkent University, Spring 2020.")
     utils.table_name = "TipOfMyTongue_sub"
     #graph_engineering.db_to_graph("../reddit-comments-may-2015/TipOfMyTongue_sub.db","TipOfMyTongue_sub_network_Dec_2020.txt",False)
-    new_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue_sub_network_Dec_2020.txt')
+    #new_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue_sub_network_Dec_2020.txt')
     
     
