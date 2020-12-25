@@ -147,7 +147,7 @@ def evaluate_cluster_to_community(communities,clusters,number_of_algorithms):
         cluster1_list = list(map(lambda x: x[i], od1.values()))
         cluster2_list = list(map(lambda x: x[i], od2.values()))
         ari = metrics.adjusted_rand_score(cluster1_list, cluster2_list)
-        ami = metrics.adjusted_mutual_info_score(cluster1_list, cluster2_list) 
+        ami = metrics.adjusted_mutual_info_score(cluster1_list, cluster2_list, average_method='arithmetic') 
         v_score = metrics.v_measure_score(cluster1_list, cluster2_list)
         fmc = metrics.fowlkes_mallows_score(cluster1_list, cluster2_list)
         evaluations.append((ari,ami,v_score,fmc))
@@ -157,12 +157,13 @@ def evaluate_cluster_to_community(communities,clusters,number_of_algorithms):
 def plot_results(evaluations, cluster_name,file_name):
     #x= ["Adjusted Rand Index", "Adjusted Mutual Information", "V-measure","Fowlkes-Mallows Index"]
     x= ["ARI", "AMI", "V-measure","FMI"]
-    community_algorithms = ["Fast Greedy","Leiden","Label Propogation",'''"Newman's EigenVector"''',"Multi-level Clustering"]
+    community_algorithms = ["Fast \nGreedy","Leiden","Label \nPropogation",'''Newman's \nEigenVector''',"Multi-level \nClustering"]
     
+    unzipped = list(zip(*evaluations))
     if not evaluations:
         return
-    for i in range(len(evaluations)):
-        plt.plot(x,list(evaluations[i]),label = community_algorithms[i])
+    for i in range(len(x)):
+        plt.plot(community_algorithms,list(unzipped[i]),label = x[i])
     
     plt.title("Evaluations for " + cluster_name) 
     # naming the x axis 
