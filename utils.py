@@ -145,7 +145,7 @@ def evaluate_cluster_to_community(communities,clusters,number_of_algorithms):
         
     for i in range(0,number_of_algorithms):
         cluster1_list = list(map(lambda x: x[i], od1.values()))
-        cluster2_list = list(map(lambda x: x[0], od2.values()))
+        cluster2_list = list(map(lambda x: x[i], od2.values()))
         ari = metrics.adjusted_rand_score(cluster1_list, cluster2_list)
         ami = metrics.adjusted_mutual_info_score(cluster1_list, cluster2_list) 
         v_score = metrics.v_measure_score(cluster1_list, cluster2_list)

@@ -74,12 +74,21 @@ def feature_to_cluster(feature_filenames_cluster, num_clusters):
             points.itemset((i, j), feature_normed[i][1])
     points[np.isfinite(points) == False] = 1 # for safety
     points[np.isnan(points) == True] = 0 # for safety
-    kmeans = KMeans(n_clusters = num_clusters)
-    kmeans = kmeans.fit(points)
-    labels = kmeans.predict(points)
+    
     clusters = {}
+    kmeans = KMeans(n_clusters = num_clusters[0])
+    kmeans = kmeans.fit(points)
+    labels = kmeans.predict(points)     
     for i in tqdm(range(len(authors))):
        clusters[authors[i]] = (labels[i],)
+    
+    for clusterSize in num_clusters[1:]:     
+        kmeans = KMeans(n_clusters = clusterSize)
+        kmeans = kmeans.fit(points)
+        labels = kmeans.predict(points)     
+        for i in tqdm(range(len(authors))):
+           clusters[authors[i]] += (labels[i],)
+           
     kmeans_file = open('kmeans_clusters.pkl', 'wb')
     pickle.dump(clusters, kmeans_file)
     kmeans_file.close()
@@ -92,7 +101,7 @@ def new_experiment(dataset_filename, network_filename):
     graph_engineering.db_to_graph(dataset_filename, network_filename, parenting=False)
     
     print('Community detection...')
-    topological_community,used_authors = graph_engineering.community_detection(network_filename)
+    topological_community,used_authors,numClusters = graph_engineering.community_detection(network_filename)
     print('Used authors : ' + str(used_authors))
 
     # Feature Extraction
@@ -104,13 +113,13 @@ def new_experiment(dataset_filename, network_filename):
     # TODO number of clusters based on how many communities
     print('Cluster communities...')
     clusters = []
-    clusters.append(feature_to_cluster(feature_file_list[1:8], 100))
+    clusters.append(feature_to_cluster(feature_file_list[1:8], numClusters))
     
     # Evaluation
     print('Evaluations.....')
     cluster_names = ['K-means']
     for i, cluster in enumerate(clusters):
-        evaluations = utils.evaluate_cluster_to_community(topological_community, cluster, 4)
+        evaluations = utils.evaluate_cluster_to_community(topological_community, cluster, 5)
         utils.plot_results(evaluations,cluster_names[i], "results/" + os.path.basename(dataset_filename)[:-3] + "_result_" + cluster_names[i].replace(" ", "_") + ".png")
 
 
@@ -118,6 +127,6 @@ if __name__ == '__main__':
     print("This file contains a collection of functions intended to be used in Spyder environment for the project of the course EEE 586: Statistical Foundations of Natural Language Processing in Bilkent University, Spring 2020.")
     utils.table_name = "TipOfMyTongue_sub"
     #graph_engineering.db_to_graph("../reddit-comments-may-2015/TipOfMyTongue_sub.db","TipOfMyTongue_sub_network_Dec_2020.txt",False)
-    #new_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue_sub_network_Dec_2020.txt')
+    new_experiment('../reddit-comments-may-2015/TipOfMyTongue_sub.db', 'TipOfMyTongue_sub_network_Dec_2020.txt')
     
     

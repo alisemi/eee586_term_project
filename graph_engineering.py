@@ -216,9 +216,9 @@ def community_detection(graph_file):
     g.simplify(combine_edges='sum')
     g = g.components().giant()
     
-    print("Running Community Detection Algorithms...")
+    numClusters = []
     
-        
+    print("Running Community Detection Algorithms...")    
     # Walktrap Method, time O(mn^2) and space O(n^2) in the worst case
     '''
     dendogram = g.community_walktrap(weights=g.es["weight"], steps = 4)
@@ -233,6 +233,7 @@ def community_detection(graph_file):
     print("Fast Greedy is running...")
     dendogram = g.community_fastgreedy(weights=g.es["weight"])
     clusters = dendogram.as_clustering()
+    numClusters.append(len(clusters))
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] = (clusters.membership[i],)
     print("Fast Greedy is done...")
@@ -240,6 +241,7 @@ def community_detection(graph_file):
     print("Leiden is running...")
     # Leiden, TODO parameters
     clusters = g.community_leiden(weights=g.es["weight"], n_iterations=4)
+    numClusters.append(len(clusters))
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],) 
@@ -256,29 +258,32 @@ def community_detection(graph_file):
     # Label Propogation
     print("Label Propogation is running...")
     clusters = g.community_label_propagation(weights=g.es["weight"])
+    numClusters.append(len(clusters))
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
     print("Label Propogation is done...")
     
     # Newman's eigenvector
-    '''
+    
     print("Newman's EigenVector is running...")
     clusters = g.community_leading_eigenvector(weights=g.es["weight"])
+    numClusters.append(len(clusters))
     #clusters = dendogram.as_clustering()
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
     print("Newman's EigenVector is done...")
-    '''
+    
         
     print("Multi level clustering is running...")
     # Multi level clustering algorithm
     clusters = g.community_multilevel(weights=g.es["weight"])
+    numClusters.append(len(clusters))
     for i in range(len(clusters.membership)):
         communities[clusters.graph.vs[i]["name"]] += (clusters.membership[i],)
     print("Multi level clustering is done...")
       
-    return communities, g.vs["name"]
+    return communities, g.vs["name"],numClusters
 
 def recursive_parenting(cur, edges, comment_id, weight):
     # Get the author and parent id of the comment
